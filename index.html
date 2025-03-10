@@ -3,462 +3,329 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAENView Monitoring Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
+    <title>Classroom Monitor - CAENView</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        body, html {
             margin: 0;
             padding: 0;
-            background-color: #f5f5f5;
+            height: 100%;
+            font-family: Arial, sans-serif;
         }
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        .dashboard-header {
+        .header {
+            background-color: #00274c;
+            color: white;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
         }
-        .room-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
         }
-        .room-card {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            padding: 15px;
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
-        .room-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        .room-header {
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        .status-item {
+        .controls {
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
+            gap: 10px;
         }
-        .status-label {
-            font-weight: 500;
+        .content {
+            display: flex;
+            flex: 1;
         }
-        .status-ok {
-            color: green;
-        }
-        .status-warning {
-            color: orange;
-        }
-        .status-error {
-            color: red;
-        }
-        .logs-container {
-            margin-top: 30px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            padding: 20px;
-        }
-        .log-entry {
-            border-bottom: 1px solid #eee;
-            padding: 10px 0;
-        }
-        .log-timestamp {
-            color: #777;
-            font-size: 0.9em;
-        }
-        .log-message {
-            margin-top: 5px;
-        }
-        .iframe-container {
+        .main-view {
+            flex: 3;
+            height: 100%;
             position: relative;
-            overflow: hidden;
-            width: 100%;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
-            margin-top: 20px;
         }
-        .responsive-iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
+        iframe {
             width: 100%;
             height: 100%;
             border: none;
         }
-        #caenview-tab, #logs-tab {
-            display: none;
+        .sidebar {
+            flex: 1;
+            background-color: #f5f5f5;
+            padding: 15px;
+            overflow-y: auto;
+            max-width: 300px;
+            border-left: 1px solid #ddd;
         }
-        .tab-active {
-            display: block !important;
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: white;
+            border-radius: 4px;
+            border-left: 3px solid #00274c;
+            font-size: 0.9rem;
         }
-        .tab-button {
-            padding: 10px 20px;
+        .alert {
+            background-color: #ffebee;
+            border-left: 3px solid #f44336;
+        }
+        .alert-bell {
+            animation: pulse 1.5s infinite;
+            color: #f44336;
+        }
+        .refresh-status {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .button {
+            padding: 8px 12px;
+            background-color: #ffcb05;
+            color: #00274c;
             border: none;
-            background-color: #f1f1f1;
+            border-radius: 4px;
             cursor: pointer;
-            border-radius: 5px 5px 0 0;
-            margin-right: 5px;
+            font-weight: bold;
         }
-        .tab-button.active {
-            background-color: #4285f4;
-            color: white;
+        .button:hover {
+            background-color: #e6b800;
         }
-        .tab-container {
-            margin-top: 20px;
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online {
+            background-color: #4caf50;
+        }
+        .status-issue {
+            background-color: #f44336;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="dashboard-header">
-            <h1>CAENView Monitoring Dashboard</h1>
-            <div>
-                <span id="status-indicator" class="badge bg-success">Connected</span>
-                <span id="last-update" class="text-secondary ms-2">Last update: Just now</span>
+        <div class="header">
+            <h1>Classroom Monitor - CAENView</h1>
+            <div class="controls">
+                <span id="status-display">
+                    <span class="status-indicator status-online"></span> Monitoring Active
+                </span>
+                <button id="refresh-btn" class="button">Manual Refresh</button>
+                <button id="toggle-log" class="button">Toggle Log</button>
+                <button id="clear-log" class="button">Clear Log</button>
+                <span id="alert-indicator" style="display: none;">
+                    <img src="/api/placeholder/24/24" alt="Alarm" id="alarm-icon" style="display: none;">
+                    <i class="alert-bell" id="alert-bell">⚠️</i>
+                </span>
             </div>
         </div>
-
-        <div class="btn-group mb-4">
-            <button class="tab-button active" id="dashboard-btn">Dashboard</button>
-            <button class="tab-button" id="caenview-btn">CAENView (Original)</button>
-            <button class="tab-button" id="logs-btn">Activity Logs</button>
-        </div>
-
-        <div id="dashboard-tab">
-            <div class="alert alert-info">
-                <strong>Info:</strong> This dashboard provides a summary view of all rooms monitored in CAENView.
-                Click on a room card to see more details.
+        <div class="content">
+            <div class="main-view">
+                <iframe id="caenview-iframe" src="https://caenview.engin.umich.edu/" title="CAENView"></iframe>
             </div>
-            
-            <div class="d-flex justify-content-between mb-3">
-                <div class="input-group" style="width: 300px;">
-                    <input type="text" id="search-input" class="form-control" placeholder="Search rooms...">
-                    <button class="btn btn-outline-secondary" type="button" id="search-button">Search</button>
-                </div>
-                <div>
-                    <select id="filter-building" class="form-select">
-                        <option value="all">All Buildings</option>
-                        <option value="Beyster">Beyster</option>
-                        <option value="Chrysler">Chrysler</option>
-                        <option value="Cooley">Cooley</option>
-                        <option value="CSRB">CSRB</option>
-                        <option value="DC">DC</option>
-                        <option value="Dow">Dow</option>
-                        <option value="EECS">EECS</option>
-                        <option value="FXB">FXB</option>
-                        <option value="GGB">GGB</option>
-                        <option value="IOE">IOE</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="room-grid" id="rooms-container">
-                <!-- Room cards will be inserted here -->
-            </div>
-        </div>
-
-        <div id="caenview-tab">
-            <div class="iframe-container">
-                <iframe id="caenview-iframe" class="responsive-iframe" src="https://caenview.engin.umich.edu/" allow="fullscreen"></iframe>
-            </div>
-        </div>
-
-        <div id="logs-tab">
-            <h2>Activity Logs</h2>
-            <div class="mb-3">
-                <button id="export-logs" class="btn btn-primary">Export Logs</button>
-                <button id="clear-logs" class="btn btn-danger ms-2">Clear Logs</button>
-            </div>
-            <div class="logs-container" id="logs-list">
-                <!-- Log entries will be inserted here -->
+            <div class="sidebar" id="log-sidebar">
+                <h2>Activity Log</h2>
+                <div class="refresh-status" id="refresh-status">Last refresh: Never</div>
+                <div id="log-container"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Sample room data based on the provided text (in a real scenario, this would be fetched from CAENView)
-        const roomData = [
-            { building: "Beyster", room: "1620", name: "Mellor Family Laboratory", power: "ok", source: "ok", projector: [{ hours: 0 }], mics: null, cameraStatus: "error" },
-            { building: "Beyster", room: "1670", power: "ok", source: "ok", projector: [{ hours: 4511 }, { hours: 4511 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "Beyster", room: "1690", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "Chrysler", room: "133", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "Chrysler", room: "220", name: "Chesebrough Auditorium", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 4, actual: 4 }, cameraStatus: "error" },
-            { building: "Cooley", room: "1940", power: "ok", source: "ok", projector: [{ hours: 277 }], mics: { expected: 1, actual: 0, status: "disconnected" }, cameraStatus: "error" },
-            { building: "EECS", room: "1303", power: "ok", source: "ok", projector: [{ hours: 1960 }, { hours: 1960 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "EECS", room: "1311", power: "ok", source: "ok", projector: [{ hours: 2582 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "EECS", room: "1500", power: "ok", source: "ok", projector: [{ hours: 2335 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            // Add more rooms as needed
-        ];
+        // Configuration
+        const REFRESH_INTERVAL = 60000; // 1 minute in milliseconds
+        const MAX_LOG_ENTRIES = 100;
+        let logVisible = true;
+        let alertActive = false;
+        let monitoringActive = true;
+        let refreshTimer;
+        let lastSnapshot = {};
 
-        // Initialize logs array
-        let activityLogs = JSON.parse(localStorage.getItem('caenview_logs') || '[]');
+        // DOM Elements
+        const iframe = document.getElementById('caenview-iframe');
+        const logContainer = document.getElementById('log-container');
+        const refreshStatus = document.getElementById('refresh-status');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const toggleLogBtn = document.getElementById('toggle-log');
+        const clearLogBtn = document.getElementById('clear-log');
+        const logSidebar = document.getElementById('log-sidebar');
+        const alertIndicator = document.getElementById('alert-indicator');
+        const alertBell = document.getElementById('alert-bell');
+        const statusDisplay = document.getElementById('status-display');
+        const statusIndicator = statusDisplay.querySelector('.status-indicator');
 
-        // Function to log activity
-        function logActivity(action, details) {
-            const logEntry = {
-                timestamp: new Date().toISOString(),
-                action: action,
-                details: details
-            };
-            
-            activityLogs.unshift(logEntry); // Add to beginning of array
-            
-            // Keep only the latest 1000 logs
-            if (activityLogs.length > 1000) {
-                activityLogs = activityLogs.slice(0, 1000);
-            }
-            
-            // Save to localStorage
-            localStorage.setItem('caenview_logs', JSON.stringify(activityLogs));
-            
-            // Update the logs display if the logs tab is active
-            if ($("#logs-tab").hasClass("tab-active")) {
-                renderLogs();
-            }
-            
-            // In a real implementation, you might want to send this to a server
-            console.log(`Logged: ${action} - ${details}`);
-        }
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initMonitoring();
+            addLogEntry('Monitoring system initialized', 'info');
+            refreshIframe();
+            startAutoRefresh();
+        });
 
-        // Function to render logs
-        function renderLogs() {
-            const logsContainer = $("#logs-list");
-            logsContainer.empty();
-            
-            if (activityLogs.length === 0) {
-                logsContainer.append('<div class="log-entry"><p class="text-center">No logs available</p></div>');
-                return;
-            }
-            
-            activityLogs.forEach(log => {
-                const date = new Date(log.timestamp);
-                const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-                
-                const logEntryHtml = `
-                    <div class="log-entry">
-                        <div class="log-timestamp">${formattedDate}</div>
-                        <div class="log-message"><strong>${log.action}:</strong> ${log.details}</div>
-                    </div>
-                `;
-                
-                logsContainer.append(logEntryHtml);
+        // Event Listeners
+        refreshBtn.addEventListener('click', () => {
+            refreshIframe();
+            addLogEntry('Manual refresh triggered', 'info');
+        });
+
+        toggleLogBtn.addEventListener('click', () => {
+            logVisible = !logVisible;
+            logSidebar.style.display = logVisible ? 'block' : 'none';
+            toggleLogBtn.textContent = logVisible ? 'Hide Log' : 'Show Log';
+        });
+
+        clearLogBtn.addEventListener('click', () => {
+            clearLog();
+            addLogEntry('Log cleared', 'info');
+        });
+
+        // Functions
+        function initMonitoring() {
+            // Set up message event listener to capture communication from iframe
+            window.addEventListener('message', (event) => {
+                if (event.origin === 'https://caenview.engin.umich.edu') {
+                    processIframeMessage(event.data);
+                }
             });
         }
 
-        // Function to render room cards
-        function renderRooms(rooms) {
-            const roomsContainer = $("#rooms-container");
-            roomsContainer.empty();
+        function startAutoRefresh() {
+            // Clear any existing timers
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
             
-            rooms.forEach(room => {
-                const roomName = room.name ? `${room.building} ${room.room} - ${room.name}` : `${room.building} ${room.room}`;
+            // Set up new timer
+            refreshTimer = setInterval(() => {
+                if (monitoringActive) {
+                    refreshIframe();
+                    addLogEntry('Auto-refresh performed', 'info');
+                }
+            }, REFRESH_INTERVAL);
+            
+            addLogEntry(`Auto-refresh started (every ${REFRESH_INTERVAL/1000} seconds)`, 'info');
+        }
+
+        function refreshIframe() {
+            // Force iframe to reload
+            iframe.src = iframe.src;
+            updateRefreshStatus();
+        }
+
+        function updateRefreshStatus() {
+            const now = new Date();
+            refreshStatus.textContent = `Last refresh: ${now.toLocaleTimeString()}`;
+        }
+
+        function checkForAlerts(contentSnapshot) {
+            // This is a simplified example - in a real implementation,
+            // you would compare the current state with the previous state
+            // to identify changes or issues
+            
+            // For demonstration, we'll simulate classroom alerts
+            // based on randomly finding keywords in the content
+            const simulateAlert = Math.random() < 0.3; // 30% chance of an alert for demo purposes
+            
+            if (simulateAlert) {
+                setAlertState(true, 'Potential issue detected');
+                return true;
+            }
+            
+            return false;
+        }
+
+        function processIframeMessage(data) {
+            // In a real implementation, we would receive and process messages
+            // from the iframe (if the target site is set up to send them)
+            addLogEntry(`Received update from CAENView`, 'info');
+        }
+
+        function captureSnapshot() {
+            // In practice, this would capture the current state of classrooms
+            // from the iframe content, but as we can't directly access iframe content
+            // from another domain due to security restrictions, this is for demonstration
+            
+            try {
+                // This is a simulated snapshot
+                const snapshot = {
+                    timestamp: new Date().toISOString(),
+                    classroomsActive: Math.floor(Math.random() * 20) + 10,
+                    classroomsWithIssues: Math.floor(Math.random() * 5)
+                };
                 
-                let micsStatus = "";
-                if (room.mics) {
-                    if (room.mics.status === "disconnected") {
-                        micsStatus = `<div class="status-item">
-                            <span class="status-label">Mics:</span>
-                            <span class="status-error">Disconnected</span>
-                        </div>`;
-                    } else {
-                        const micsClass = room.mics.expected === room.mics.actual ? "status-ok" : "status-warning";
-                        micsStatus = `<div class="status-item">
-                            <span class="status-label">Mics:</span>
-                            <span class="${micsClass}">${room.mics.actual || 0}/${room.mics.expected} available</span>
-                        </div>`;
+                if (snapshot.classroomsWithIssues > 0) {
+                    setAlertState(true, `${snapshot.classroomsWithIssues} classrooms need attention`);
+                } else {
+                    setAlertState(false);
+                }
+                
+                // Compare with last snapshot and log differences
+                if (lastSnapshot.classroomsActive !== snapshot.classroomsActive) {
+                    addLogEntry(`Active classrooms changed: ${lastSnapshot.classroomsActive || 0} → ${snapshot.classroomsActive}`, 'info');
+                }
+                
+                if (lastSnapshot.classroomsWithIssues !== snapshot.classroomsWithIssues) {
+                    if (snapshot.classroomsWithIssues > 0) {
+                        addLogEntry(`${snapshot.classroomsWithIssues} classrooms need attention`, 'alert');
+                    } else if (lastSnapshot.classroomsWithIssues > 0) {
+                        addLogEntry(`All classroom issues resolved`, 'info');
                     }
                 }
                 
-                let projectorInfo = "";
-                if (room.projector && room.projector.length > 0) {
-                    room.projector.forEach((proj, index) => {
-                        const projClass = proj.hours > 3000 ? "status-warning" : "status-ok";
-                        projectorInfo += `<div class="status-item">
-                            <span class="status-label">Projector ${index + 1}:</span>
-                            <span class="${projClass}">${proj.hours} hours</span>
-                        </div>`;
-                    });
-                }
+                lastSnapshot = snapshot;
                 
-                const cameraClass = room.cameraStatus === "ok" ? "status-ok" : "status-error";
-                const cameraText = room.cameraStatus === "ok" ? "Working" : "Could not load camera";
-                
-                const cardHtml = `
-                    <div class="room-card" data-room="${room.building} ${room.room}">
-                        <div class="room-header">${roomName}</div>
-                        <div class="status-item">
-                            <span class="status-label">Camera:</span>
-                            <span class="${cameraClass}">${cameraText}</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Power:</span>
-                            <span class="status-ok">On</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">Source:</span>
-                            <span class="status-ok">Connected</span>
-                        </div>
-                        ${micsStatus}
-                        ${projectorInfo}
-                    </div>
-                `;
-                
-                roomsContainer.append(cardHtml);
-            });
-            
-            // Add click event to cards
-            $(".room-card").click(function() {
-                const roomName = $(this).data("room");
-                logActivity("Room Details Viewed", roomName);
-                alert(`Detailed view for ${roomName} would open here`);
-            });
+            } catch (error) {
+                addLogEntry(`Error capturing snapshot: ${error.message}`, 'error');
+            }
         }
 
-        // Tab switching functionality
-        $("#dashboard-btn").click(function() {
-            $(".tab-button").removeClass("active");
-            $(this).addClass("active");
-            $("#dashboard-tab").addClass("tab-active");
-            $("#caenview-tab").removeClass("tab-active");
-            $("#logs-tab").removeClass("tab-active");
-            logActivity("Tab Changed", "Dashboard view");
-        });
-        
-        $("#caenview-btn").click(function() {
-            $(".tab-button").removeClass("active");
-            $(this).addClass("active");
-            $("#dashboard-tab").removeClass("tab-active");
-            $("#caenview-tab").addClass("tab-active");
-            $("#logs-tab").removeClass("tab-active");
-            logActivity("Tab Changed", "Original CAENView iframe loaded");
-        });
-        
-        $("#logs-btn").click(function() {
-            $(".tab-button").removeClass("active");
-            $(this).addClass("active");
-            $("#dashboard-tab").removeClass("tab-active");
-            $("#caenview-tab").removeClass("tab-active");
-            $("#logs-tab").addClass("tab-active");
-            renderLogs();
-            logActivity("Tab Changed", "Logs view");
-        });
-
-        // Filter functionality
-        $("#filter-building").change(function() {
-            const building = $(this).val();
-            let filteredRooms = roomData;
+        function setAlertState(active, message = null) {
+            alertActive = active;
+            alertIndicator.style.display = active ? 'inline-block' : 'none';
             
-            if (building !== "all") {
-                filteredRooms = roomData.filter(room => room.building === building);
+            if (active && message) {
+                addLogEntry(message, 'alert');
+                statusIndicator.className = 'status-indicator status-issue';
+                statusDisplay.querySelector('span:not(.status-indicator)').textContent = 'Alert Detected';
+            } else if (!active) {
+                statusIndicator.className = 'status-indicator status-online';
+                statusDisplay.querySelector('span:not(.status-indicator)').textContent = 'Monitoring Active';
             }
-            
-            renderRooms(filteredRooms);
-            logActivity("Filter Applied", `Building: ${building}`);
-        });
+        }
 
-        // Search functionality
-        $("#search-button").click(function() {
-            const searchTerm = $("#search-input").val().toLowerCase();
-            let filteredRooms = roomData;
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
             
-            if (searchTerm) {
-                filteredRooms = roomData.filter(room => {
-                    const roomName = room.name ? `${room.building} ${room.room} ${room.name}` : `${room.building} ${room.room}`;
-                    return roomName.toLowerCase().includes(searchTerm);
-                });
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>${timestamp}</strong> - ${message}`;
+            
+            logContainer.insertBefore(entry, logContainer.firstChild);
+            
+            // Limit log entries
+            const entries = logContainer.querySelectorAll('.log-entry');
+            if (entries.length > MAX_LOG_ENTRIES) {
+                for (let i = MAX_LOG_ENTRIES; i < entries.length; i++) {
+                    logContainer.removeChild(entries[i]);
+                }
             }
-            
-            renderRooms(filteredRooms);
-            logActivity("Search Performed", `Term: ${searchTerm}`);
-        });
-        
-        // Search on enter key
-        $("#search-input").keyup(function(e) {
-            if (e.keyCode === 13) {
-                $("#search-button").click();
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+
+        // Set up periodic snapshot capture
+        setInterval(() => {
+            if (monitoringActive) {
+                captureSnapshot();
             }
-        });
-
-        // Log export functionality
-        $("#export-logs").click(function() {
-            const logsJSON = JSON.stringify(activityLogs, null, 2);
-            const blob = new Blob([logsJSON], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `caenview_logs_${new Date().toISOString().slice(0,10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            logActivity("Logs Exported", "Logs exported to JSON file");
-        });
-
-        // Clear logs functionality
-        $("#clear-logs").click(function() {
-            if (confirm("Are you sure you want to clear all logs? This cannot be undone.")) {
-                activityLogs = [];
-                localStorage.setItem('caenview_logs', JSON.stringify(activityLogs));
-                renderLogs();
-                logActivity("Logs Cleared", "All previous logs were cleared");
-            }
-        });
-
-        // Monitor iframe activity
-        $("#caenview-iframe").on("load", function() {
-            logActivity("CAENView Iframe", "Original CAENView page loaded");
-            
-            try {
-                // Try to access iframe content (may fail due to same-origin policy)
-                const iframe = document.getElementById('caenview-iframe');
-                const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
-                
-                // Monitor clicks within the iframe
-                iframeDocument.addEventListener('click', function(e) {
-                    logActivity("Iframe Interaction", `Clicked on ${e.target.tagName} element`);
-                });
-            } catch (e) {
-                console.log("Could not access iframe content due to same-origin policy");
-                logActivity("Error", "Could not monitor iframe due to same-origin policy");
-            }
-        });
-
-        // Initialize the dashboard
-        $(document).ready(function() {
-            // Set initial tab
-            $("#dashboard-tab").addClass("tab-active");
-            
-            // Render room data
-            renderRooms(roomData);
-            
-            // Simulate periodic updates (in a real app, this would fetch from the actual CAENView)
-            setInterval(function() {
-                $("#last-update").text(`Last update: ${new Date().toLocaleTimeString()}`);
-                logActivity("System", "Automatic data refresh");
-            }, 300000); // Every 5 minutes
-            
-            // Log initial load
-            logActivity("Page Load", "Dashboard initialized");
-        });
+        }, 10000); // Capture snapshot every 10 seconds
     </script>
 </body>
 </html>
