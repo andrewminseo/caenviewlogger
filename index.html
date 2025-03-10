@@ -198,4 +198,267 @@
             { building: "Beyster", room: "1620", name: "Mellor Family Laboratory", power: "ok", source: "ok", projector: [{ hours: 0 }], mics: null, cameraStatus: "error" },
             { building: "Beyster", room: "1670", power: "ok", source: "ok", projector: [{ hours: 4511 }, { hours: 4511 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
             { building: "Beyster", room: "1690", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
-            { building: "Chrysler", room: "133", power: "ok", source: "ok", pr
+            { building: "Chrysler", room: "133", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
+            { building: "Chrysler", room: "220", name: "Chesebrough Auditorium", power: "ok", source: "ok", projector: [{ hours: 0 }, { hours: 0 }], mics: { expected: 4, actual: 4 }, cameraStatus: "error" },
+            { building: "Cooley", room: "1940", power: "ok", source: "ok", projector: [{ hours: 277 }], mics: { expected: 1, actual: 0, status: "disconnected" }, cameraStatus: "error" },
+            { building: "EECS", room: "1303", power: "ok", source: "ok", projector: [{ hours: 1960 }, { hours: 1960 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
+            { building: "EECS", room: "1311", power: "ok", source: "ok", projector: [{ hours: 2582 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
+            { building: "EECS", room: "1500", power: "ok", source: "ok", projector: [{ hours: 2335 }], mics: { expected: 2, actual: 2 }, cameraStatus: "error" },
+            // Add more rooms as needed
+        ];
+
+        // Initialize logs array
+        let activityLogs = JSON.parse(localStorage.getItem('caenview_logs') || '[]');
+
+        // Function to log activity
+        function logActivity(action, details) {
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                action: action,
+                details: details
+            };
+            
+            activityLogs.unshift(logEntry); // Add to beginning of array
+            
+            // Keep only the latest 1000 logs
+            if (activityLogs.length > 1000) {
+                activityLogs = activityLogs.slice(0, 1000);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('caenview_logs', JSON.stringify(activityLogs));
+            
+            // Update the logs display if the logs tab is active
+            if ($("#logs-tab").hasClass("tab-active")) {
+                renderLogs();
+            }
+            
+            // In a real implementation, you might want to send this to a server
+            console.log(`Logged: ${action} - ${details}`);
+        }
+
+        // Function to render logs
+        function renderLogs() {
+            const logsContainer = $("#logs-list");
+            logsContainer.empty();
+            
+            if (activityLogs.length === 0) {
+                logsContainer.append('<div class="log-entry"><p class="text-center">No logs available</p></div>');
+                return;
+            }
+            
+            activityLogs.forEach(log => {
+                const date = new Date(log.timestamp);
+                const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+                
+                const logEntryHtml = `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${formattedDate}</div>
+                        <div class="log-message"><strong>${log.action}:</strong> ${log.details}</div>
+                    </div>
+                `;
+                
+                logsContainer.append(logEntryHtml);
+            });
+        }
+
+        // Function to render room cards
+        function renderRooms(rooms) {
+            const roomsContainer = $("#rooms-container");
+            roomsContainer.empty();
+            
+            rooms.forEach(room => {
+                const roomName = room.name ? `${room.building} ${room.room} - ${room.name}` : `${room.building} ${room.room}`;
+                
+                let micsStatus = "";
+                if (room.mics) {
+                    if (room.mics.status === "disconnected") {
+                        micsStatus = `<div class="status-item">
+                            <span class="status-label">Mics:</span>
+                            <span class="status-error">Disconnected</span>
+                        </div>`;
+                    } else {
+                        const micsClass = room.mics.expected === room.mics.actual ? "status-ok" : "status-warning";
+                        micsStatus = `<div class="status-item">
+                            <span class="status-label">Mics:</span>
+                            <span class="${micsClass}">${room.mics.actual || 0}/${room.mics.expected} available</span>
+                        </div>`;
+                    }
+                }
+                
+                let projectorInfo = "";
+                if (room.projector && room.projector.length > 0) {
+                    room.projector.forEach((proj, index) => {
+                        const projClass = proj.hours > 3000 ? "status-warning" : "status-ok";
+                        projectorInfo += `<div class="status-item">
+                            <span class="status-label">Projector ${index + 1}:</span>
+                            <span class="${projClass}">${proj.hours} hours</span>
+                        </div>`;
+                    });
+                }
+                
+                const cameraClass = room.cameraStatus === "ok" ? "status-ok" : "status-error";
+                const cameraText = room.cameraStatus === "ok" ? "Working" : "Could not load camera";
+                
+                const cardHtml = `
+                    <div class="room-card" data-room="${room.building} ${room.room}">
+                        <div class="room-header">${roomName}</div>
+                        <div class="status-item">
+                            <span class="status-label">Camera:</span>
+                            <span class="${cameraClass}">${cameraText}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Power:</span>
+                            <span class="status-ok">On</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Source:</span>
+                            <span class="status-ok">Connected</span>
+                        </div>
+                        ${micsStatus}
+                        ${projectorInfo}
+                    </div>
+                `;
+                
+                roomsContainer.append(cardHtml);
+            });
+            
+            // Add click event to cards
+            $(".room-card").click(function() {
+                const roomName = $(this).data("room");
+                logActivity("Room Details Viewed", roomName);
+                alert(`Detailed view for ${roomName} would open here`);
+            });
+        }
+
+        // Tab switching functionality
+        $("#dashboard-btn").click(function() {
+            $(".tab-button").removeClass("active");
+            $(this).addClass("active");
+            $("#dashboard-tab").addClass("tab-active");
+            $("#caenview-tab").removeClass("tab-active");
+            $("#logs-tab").removeClass("tab-active");
+            logActivity("Tab Changed", "Dashboard view");
+        });
+        
+        $("#caenview-btn").click(function() {
+            $(".tab-button").removeClass("active");
+            $(this).addClass("active");
+            $("#dashboard-tab").removeClass("tab-active");
+            $("#caenview-tab").addClass("tab-active");
+            $("#logs-tab").removeClass("tab-active");
+            logActivity("Tab Changed", "Original CAENView iframe loaded");
+        });
+        
+        $("#logs-btn").click(function() {
+            $(".tab-button").removeClass("active");
+            $(this).addClass("active");
+            $("#dashboard-tab").removeClass("tab-active");
+            $("#caenview-tab").removeClass("tab-active");
+            $("#logs-tab").addClass("tab-active");
+            renderLogs();
+            logActivity("Tab Changed", "Logs view");
+        });
+
+        // Filter functionality
+        $("#filter-building").change(function() {
+            const building = $(this).val();
+            let filteredRooms = roomData;
+            
+            if (building !== "all") {
+                filteredRooms = roomData.filter(room => room.building === building);
+            }
+            
+            renderRooms(filteredRooms);
+            logActivity("Filter Applied", `Building: ${building}`);
+        });
+
+        // Search functionality
+        $("#search-button").click(function() {
+            const searchTerm = $("#search-input").val().toLowerCase();
+            let filteredRooms = roomData;
+            
+            if (searchTerm) {
+                filteredRooms = roomData.filter(room => {
+                    const roomName = room.name ? `${room.building} ${room.room} ${room.name}` : `${room.building} ${room.room}`;
+                    return roomName.toLowerCase().includes(searchTerm);
+                });
+            }
+            
+            renderRooms(filteredRooms);
+            logActivity("Search Performed", `Term: ${searchTerm}`);
+        });
+        
+        // Search on enter key
+        $("#search-input").keyup(function(e) {
+            if (e.keyCode === 13) {
+                $("#search-button").click();
+            }
+        });
+
+        // Log export functionality
+        $("#export-logs").click(function() {
+            const logsJSON = JSON.stringify(activityLogs, null, 2);
+            const blob = new Blob([logsJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `caenview_logs_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            logActivity("Logs Exported", "Logs exported to JSON file");
+        });
+
+        // Clear logs functionality
+        $("#clear-logs").click(function() {
+            if (confirm("Are you sure you want to clear all logs? This cannot be undone.")) {
+                activityLogs = [];
+                localStorage.setItem('caenview_logs', JSON.stringify(activityLogs));
+                renderLogs();
+                logActivity("Logs Cleared", "All previous logs were cleared");
+            }
+        });
+
+        // Monitor iframe activity
+        $("#caenview-iframe").on("load", function() {
+            logActivity("CAENView Iframe", "Original CAENView page loaded");
+            
+            try {
+                // Try to access iframe content (may fail due to same-origin policy)
+                const iframe = document.getElementById('caenview-iframe');
+                const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // Monitor clicks within the iframe
+                iframeDocument.addEventListener('click', function(e) {
+                    logActivity("Iframe Interaction", `Clicked on ${e.target.tagName} element`);
+                });
+            } catch (e) {
+                console.log("Could not access iframe content due to same-origin policy");
+                logActivity("Error", "Could not monitor iframe due to same-origin policy");
+            }
+        });
+
+        // Initialize the dashboard
+        $(document).ready(function() {
+            // Set initial tab
+            $("#dashboard-tab").addClass("tab-active");
+            
+            // Render room data
+            renderRooms(roomData);
+            
+            // Simulate periodic updates (in a real app, this would fetch from the actual CAENView)
+            setInterval(function() {
+                $("#last-update").text(`Last update: ${new Date().toLocaleTimeString()}`);
+                logActivity("System", "Automatic data refresh");
+            }, 300000); // Every 5 minutes
+            
+            // Log initial load
+            logActivity("Page Load", "Dashboard initialized");
+        });
+    </script>
+</body>
+</html>
